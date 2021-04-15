@@ -1,28 +1,40 @@
 import unittest
 from . import romanz
 
+_TEST_GALCAT_ = "data/Akari_Hosts_subset_SNR_v7.HOSTLIB"
+
 class TestCatalogBasedRedshiftSim(unittest.TestCase):
     """Test class for projecting redshift completeness from an input
     galaxy catalog.
     """
+
+    #def setUpClass(cls) -> None:
+    #    """ Called once, before all tests"""
+
+    def setUp(self) -> None:
+        """Called before each and every test"""
+        self.romanz_sim = romanz.CatalogBasedRedshiftSim()
+        self.romanz_sim.read_galaxy_catalog(_TEST_GALCAT_)
+        return
 
     def test_read_catalog(self):
         """Read in a catalog of galaxy properties"""
         # TODO : convert to a unittest setup step?
         self.assertEqual(True, False)
 
-    def test_read_specz_completeness_map(self):
-        """Read in a 'map' for spectroscopic redshift completeness, which
-        maps from one or more galaxy properties (mag, SFR, z...) onto a
-        probability of getting a spec-z.
+    def test_pick_host_galaxies(self):
+        """Use a SN rate function to define a random
+        sampling of the galaxies that are SN hosts
         """
-        # TODO : convert to a unittest setup step?
         self.assertEqual(True, False)
 
     def test_apply_specz_completeness_map(self):
-        """Apply a specz completeness map (already read in) to a catalog
-        of host galaxy properties (already read in) to define a random
-        sampling of the galaxies that are SN hosts, and define exactly which
+        """ Read in a 'map' for spectroscopic redshift completeness, which
+        maps from one or more galaxy properties (mag, SFR, z...) onto a
+        probability of getting a spec-z.
+
+        Then apply this specz completeness map to a catalog
+        of SN host galaxy properties (already read in) to define exactly which
         of those host galaxies gets a redshift.
         """
         self.assertEqual(True, False)
