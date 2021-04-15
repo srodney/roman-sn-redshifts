@@ -123,33 +123,39 @@ class CatalogBasedRedshiftSim():
             snr = A * 10 ** self.galaxies[logmasscolname] + B * 10 ** self.galaxies[logsfrcolname]
             # divide by the total snr to get relative probabilities
             snr /= np.nanmax(snr)
+            snrcolname = 'snr_A+B'
             snrcol = table.Column(data=snr, name='snr_A+B')
-            if 'snr_A+B' in self.galaxies.colnames:
-                self.galaxies['snr_A+B'] = snr
-            else:
-                self.galaxies.add_column(snrcol)
         elif snr_model.lower() == 'ah18s':
             logssfr = self.galaxies[logsfrcolname] - self.galaxies[logmasscolname]
             ssnr = ssnr_ah18_smooth(logssfr)
             snr = ssnr * 10 ** self.galaxies[logmasscolname]
             snr /= np.nanmax(snr)
-            snrcolname = 'snr_AH17_smooth'
+            snrcolname = 'snr_AH18_smooth'
             snrcol = table.Column(data=snr, name=snrcolname)
-            if snrcolname in self.galaxies.colnames:
-                self.galaxies[snrcolname] = snr
-            else:
-                self.galaxies.add_column(snrcol)
+        elif snr_model.lower() == 'ah18pw':
+            logssfr = self.galaxies[logsfrcolname] - self.galaxies[logmasscolname]
+            ssnr = ssnr_ah18_piecewise(logssfr)
+            snr = ssnr * 10 ** self.galaxies[logmasscolname]
+            snr /= np.nanmax(snr)
+            snrcolname = 'snr_AH18_piecewise'
+        else:
+            raise RuntimeError(r"{snr_model} is not a know SN rate model.")
 
+        snrcol = table.Column(data=snr, name=snrcolname)
+        if snrcolname in self.galaxies.colnames:
+            self.galaxies[snrcolname] = snr
+        else:
+            self.galaxies.add_column(snrcol)
         if verbose:
-            print("Added/updated SN rate weight column using {} model".format(snr_model))
-
+            print(r"Added/updated relative SN rate column using {snr_model} model")
         return
 
 
-    def pick_host_galaxies(self, logsfrcolname='lsfr', logmasscolname='lmass',
-                           snr_model='AH17'):
-        """Use a SN rate function to define a random
-        sampling of the galaxies that are SN hosts.
+    def pick_host_galaxies(self, nsn, snrcolname='snr_AH18_'):
+        """Do a random draw to assign 'nsn' supernovae to galaxies in the
+        galaxies catalog, based on the (pre-defined) relative SN rates.
+
+        a SN rate function to define a random sampling of the galaxies that are SN hosts.
 
         Alternatively, read in a SNANA output file (.dump file maybe?) that
         has already run a survey simulation and picked host galaxies.
