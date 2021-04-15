@@ -147,38 +147,59 @@ class CatalogBasedRedshiftSim():
         else:
             self.galaxies.add_column(snrcol)
         if verbose:
-            print(r"Added/updated relative SN rate column using {snr_model} model")
+            print(f"Added/updated relative SN rate column using {snr_model} model")
         return
 
 
-    def pick_host_galaxies(self, nsn, snrcolname='snr_AH18_'):
+    def pick_host_galaxies(self, nsn, snrcolname='snr_AH18_piecewise',
+                           replace=False, verbose=True):
         """Do a random draw to assign 'nsn' supernovae to galaxies in the
         galaxies catalog, based on the (pre-defined) relative SN rates.
 
-        a SN rate function to define a random sampling of the galaxies that are SN hosts.
+        TODO: (Alternatively, read in a SNANA output file (.dump file maybe?)
+        that has already run a survey simulation and picked host galaxies.)
 
-        Alternatively, read in a SNANA output file (.dump file maybe?) that
-        has already run a survey simulation and picked host galaxies.
+        Parameters
+        ----------
+        replace
+        nsn : int
+          number of SN to assign to host galaxies
+
+        snrcolname : str
+           name of the column in the galaxies catalog that gives the relative
+           SN rate (or 'weight') for each galaxy.  This may be created by the
+           assign_snhost_prob() method.
+
+        replace : bool
+           Whether to sample with replacement.  If True, a galaxy may host
+           more than one SN. If False, then assign no more than one SN to
+           each galaxy (requires nsn<len(galaxies))
         """
-        # get the specific star formation rate for all galaxies in the catalog
-        logssfr = self.galaxies[logsfrcolname] - self.galaxies[logmasscolname]
+        if ~replace and nsn > len(self.galaxies):
+            raise RuntimeError(
+                r'Picking hosts without replacement, but Nsn > len(galaxies)')
 
-        # convert to the specific SN rate
-        ssnr = ssnr_ah17_smooth(logssfr)
+        # Pick SN host galaxies
+        galindices = np.arange(len(self.galaxies))
+        psnhost = self.galaxies[snrcolname]/np.sum(self.galaxies[snrcolname])
+        snindices = np.random.choice(
+            galindices, nsn, replace=replace, p=psnhost)
 
-        # convert to the SN rate
-        snr = ssnr * 10**(self.galaxies[logmasscolname])
-
-        snrcol = table.Column(data=snr, name=snrcolname)
-        if snrcolname in catalog.colnames:
-            catalog[snrcolname] = snr
+        # Add a boolean 'host' column to the galaxies catalog
+        ishost = np.zeros(len(self.galaxies), dtype=bool)
+        ishost[snindices] = True
+        hostcol = table.Column(name='host', data=ishost)
+        if 'host' in self.galaxies.colnames:
+            self.galaxies['host'] = hostcol
         else:
-            catalog.add_column(snrcol)
+            self.galaxies.add_column(hostcol, index=1)
 
-        # TODO: read in a SNANA output file (.dump file maybe?) that
-        # has already run a survey simulation and picked host galaxies.
+        # TODO: Alternate approach:  read in a SNANA output file (.dump file
+        #  maybe?) that has already run a survey simulation and picked hosts.
 
-        pass
+        if verbose:
+            print(f"Assigned {nsn} SNe to hosts using {snrcolname} probabilities.")
+        return
 
 
 

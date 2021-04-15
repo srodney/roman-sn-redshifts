@@ -23,13 +23,17 @@ class TestCatalogBasedRedshiftSim(unittest.TestCase):
         self.assertTrue(self.romanz_sim.galaxies is not None)
         self.assertTrue(len(self.romanz_sim.galaxies) > 0)
 
-    def test_assign_snhost_prob(self):
+    def test_pick_host_galaxies(self):
         """Use a SN rate function to define the relative probability of each
         galaxy hosting a SN in any given year.
         """
+        # Assign probabilities based on spec. SFR
         self.romanz_sim.assign_snhost_prob(
             snr_model='AH18PW', logmasscolname='logmass',
             logsfrcolname='logsfr')
+        # Random sampling to pick host galaxies
+        self.romanz_sim.pick_host_galaxies(
+            100, snrcolname='snr_AH18_piecewise', replace=False)
 
     def test_apply_specz_completeness_map(self):
         """ Read in a 'map' for spectroscopic redshift completeness, which
