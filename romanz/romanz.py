@@ -1,6 +1,6 @@
 import numpy as np
 from astropy import units as u
-from astropy.table import Table
+from astropy import table
 from scipy import interpolate as scinterp
 
 class SNANAHostLib():
@@ -34,7 +34,7 @@ class SNANAHostLib():
             raise RuntimeError(r"{filename} is not an SNANA HOSTLIB file")
 
         if nwgtmapstart >= 0:
-            self.wgtmaptable = Table.read(
+            self.wgtmaptable = table.Table.read(
                 filename, format='ascii.basic',
                 names=['label']+varnames_wgtmap+['wgt','snmagshift'],
                 data_start=nwgtmapstart-1,
@@ -44,7 +44,7 @@ class SNANAHostLib():
         else:
             self.wgtmaptable = None
 
-        galdatatable = Table.read(filename, format='ascii.basic',
+        galdatatable = table.Table.read(filename, format='ascii.basic',
                                   header_start=ngaldataheader-1,
                                   data_start=ngaldatastart-1, comment='#'
                                   )
@@ -80,18 +80,101 @@ class CatalogBasedRedshiftSim():
             pass
         # if its not a hostlib file, use astropy Table.read()
         if self.galaxies is None:
-            self.galaxies = Table.read(filename)
+            self.galaxies = table.Table.read(filename)
         return
 
 
-    def pick_host_galaxies(self):
+    def assign_snhost_prob(self, snr_model='AH18S',
+                           logmasscolname='logmass',
+                           logsfrcolname='logsfr',
+                           verbose=True):
+        """Add a column to the 'galaxies' catalog that gives the relative
+        probability for each galaxy hosting a SN in any given observer-frame
+        year.  This is computed based on the predicted SN rate (number of SN
+        explosions per observer-frame year) of each galaxy, adopting the
+        specified SN rate model.
+
+        Parameters
+        ----------
+        snr_model : str
+           'A+B' : SNR = A*M + B*SFR   (Scannapieco & Bildsten 2005)
+           'AH18S' : the smooth logarithmic sSFR model (Andersen & Hjorth 2018)
+           'AH18PW' : the piecewise sSFR model (Andersen & Hjorth 2018)
+
+        logmasscolname : str
+           name of column in the galaxies Table containing the log10(Mass)
+
+        logsfrcolname : str
+           name of column in the galaxies Table containing the
+           log10(StarFormationRate)
+
+        verbose : bool
+            Set to True to print messages.
+        """
+        if self.galaxies is None:
+            print("No 'galaxies' catalog loaded. Use 'read_galaxy_catalog()'")
+
+        if snr_model.lower()=='a+b':
+            # Note: adopting the A and B values from Andersen & Hjorth 2018
+            # but dividing by 1e-4 (so the SNR below actually counts the number
+            # of SN explodiing per 10000 yrs)
+            A = 4.66 * 1e-10
+            B = 4.88
+            snr = A * 10 ** self.galaxies[logmasscolname] + B * 10 ** self.galaxies[logsfrcolname]
+            # divide by the total snr to get relative probabilities
+            snr /= np.nanmax(snr)
+            snrcol = table.Column(data=snr, name='snr_A+B')
+            if 'snr_A+B' in self.galaxies.colnames:
+                self.galaxies['snr_A+B'] = snr
+            else:
+                self.galaxies.add_column(snrcol)
+        elif snr_model.lower() == 'ah18s':
+            logssfr = self.galaxies[logsfrcolname] - self.galaxies[logmasscolname]
+            ssnr = ssnr_ah18_smooth(logssfr)
+            snr = ssnr * 10 ** self.galaxies[logmasscolname]
+            snr /= np.nanmax(snr)
+            snrcolname = 'snr_AH17_smooth'
+            snrcol = table.Column(data=snr, name=snrcolname)
+            if snrcolname in self.galaxies.colnames:
+                self.galaxies[snrcolname] = snr
+            else:
+                self.galaxies.add_column(snrcol)
+
+        if verbose:
+            print("Added/updated SN rate weight column using {} model".format(snr_model))
+
+        return
+
+
+    def pick_host_galaxies(self, logsfrcolname='lsfr', logmasscolname='lmass',
+                           snr_model='AH17'):
         """Use a SN rate function to define a random
         sampling of the galaxies that are SN hosts.
 
         Alternatively, read in a SNANA output file (.dump file maybe?) that
         has already run a survey simulation and picked host galaxies.
         """
+        # get the specific star formation rate for all galaxies in the catalog
+        logssfr = self.galaxies[logsfrcolname] - self.galaxies[logmasscolname]
+
+        # convert to the specific SN rate
+        ssnr = ssnr_ah17_smooth(logssfr)
+
+        # convert to the SN rate
+        snr = ssnr * 10**(self.galaxies[logmasscolname])
+
+        snrcol = table.Column(data=snr, name=snrcolname)
+        if snrcolname in catalog.colnames:
+            catalog[snrcolname] = snr
+        else:
+            catalog.add_column(snrcol)
+
+        # TODO: read in a SNANA output file (.dump file maybe?) that
+        # has already run a survey simulation and picked host galaxies.
+
         pass
+
+
 
     def apply_specz_completeness_map(self, filename,
                                      defining_columns_galcat,
@@ -171,4 +254,58 @@ class CatalogBasedRedshiftSim():
         random assignment of photo-z values.
         """
         pass
+
+
+
+def ssnr_ah18_smooth(logssfr):
+    """ Returns the Type Ia specific SN rate per Tyr
+    (number of SN Ia exploding per 10^12 yr per solar mass)
+    for a galaxy, using the model of Andersen & Hjorth 2018, which is based
+    on the specific star formation rate, given as log10(SSFR).
+    """
+    a = (1.5)*1e-13 # (1.12)*1e-13
+    b = 0.5 # 0.73
+    k = 0.4 # 0.49
+    ssfr0 = 1.7e-10# 1.665e-10
+    # logssfr0 = -9.778585762157661    # log10(ssfr0)
+    ssfr = np.power(10.,logssfr)
+    ssnr = (a + (a/k) * np.log10(ssfr/ssfr0 + b)) * 1e12
+    #ssnr = np.max(ssnr, 0.7)
+    return(ssnr)
+
+
+def ssnr_ah18_piecewise(logssfr):
+    """ Returns the Type Ia specific SN rate per Tyr
+    (number of SN Ia exploding per 10^12 yr per solar mass)
+    for a galaxy, using the piecwise linear model
+    of Andersen & Hjorth 2018, which is based
+    on the specific star formation rate, given as log10(SSFR).
+    """
+    # Note that the alpha scaling parameter
+    # has been multiplied by 1e12 to get units of Tyr-1
+    alpha = (1.12)* 1e5
+    beta = 0.586
+    ssfr2 = 1.01e-11
+    ssfr1 = 1.04e-9
+
+    S1 = np.power(ssfr1, beta)
+    S2 = np.power(ssfr2, beta)
+
+    if not np.iterable(logssfr):
+        logssfr = np.array([logssfr])
+
+    ssfr = np.power(10.,logssfr)
+
+    ilow = np.where(ssfr<=ssfr2)[0]
+    imid = np.where((ssfr>ssfr2) & (ssfr<ssfr1))[0]
+    ihi = np.where(ssfr>=ssfr1)[0]
+
+    ssnrmid = alpha * np.power(ssfr[imid], beta)
+
+    ssnr = alpha * np.where(ssfr<=ssfr2, S2,
+                            np.where(ssfr>=ssfr1, S1,
+                                     np.power(ssfr, beta)))
+    if len(ssnr)==1:
+        ssnr = ssnr[0]
+    return(ssnr)
 

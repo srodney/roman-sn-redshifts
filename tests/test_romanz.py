@@ -21,12 +21,15 @@ class TestCatalogBasedRedshiftSim(unittest.TestCase):
         """Read in a catalog of galaxy properties"""
         # TODO : convert to a unittest setup step?
         self.assertTrue(self.romanz_sim.galaxies is not None)
+        self.assertTrue(len(self.romanz_sim.galaxies) > 0)
 
-    def test_pick_host_galaxies(self):
-        """Use a SN rate function to define a random
-        sampling of the galaxies that are SN hosts
+    def test_assign_snhost_prob(self):
+        """Use a SN rate function to define the relative probability of each
+        galaxy hosting a SN in any given year.
         """
-        self.assertEqual(True, False)
+        self.romanz_sim.assign_snhost_prob(
+            snr_model='AH18PW', logmasscolname='logmass',
+            logsfrcolname='logsfr')
 
     def test_apply_specz_completeness_map(self):
         """ Read in a 'map' for spectroscopic redshift completeness, which
