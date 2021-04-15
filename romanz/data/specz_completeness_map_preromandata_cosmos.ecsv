@@ -1,21 +1,17 @@
 # %ECSV 0.9
-# Spectroscopic redshift completeness (or efficiency) as a function of magnitude
-# based on the current (c. 2021) specz survey data in the COSMOS field.
-# The mag column records AB mags that define the center of 0.2-mag bins. The
-# 'fracwithspecz_X' columns report the fraction of galaxies for which a spec-z is
-# already measured, out of all known galaxies in the cosmos field that have AB mag
-# for SDSS bandpass X landing in that bin.
 # ---
 # delimiter: ','
 # datatype: [
 #   { name: binlabel, datatype: string  },
 #   { name: mag,      datatype: float64, unit: mag  },
-#   { name: fracwithspecz_g,    datatype: float64  },
-#   { name: fracwithspecz_r,    datatype: float64  },
-#   { name: fracwithspecz_i,    datatype: float64  },
-#   { name: fracwithspecz_z,    datatype: float64  },
-#   { name: fracwithspecz_y,    datatype: float64  },
+#   { name: efficiency_g,    datatype: float64  },
+#   { name: efficiency_r,    datatype: float64  },
+#   { name: efficiency_i,    datatype: float64  },
+#   { name: efficiency_z,    datatype: float64  },
+#   { name: efficiency_y,    datatype: float64  },
 # ]
+# meta: !!omap
+# - description: Spectroscopic redshift completeness (or efficiency) as a function of magnitude based on the current (c. 2021) specz survey data in the COSMOS field. The mag column records AB mags that define the center of 0.2-mag bins. The 'efficiency_X' columns report the fraction of galaxies for which a spec-z is already measured, out of all known galaxies in the cosmos field that have AB mag for SDSS bandpass X landing in that bin.
 binlabel,mag,efficiency_g,efficiency_r,efficiency_i,efficiency_z,efficiency_y
 "(14.0, 14.2]",14.0,NaN,NaN,NaN,NaN,1.0
 "(14.2, 14.4]",14.2,NaN,NaN,NaN,1.0,1.0

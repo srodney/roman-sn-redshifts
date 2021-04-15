@@ -1,7 +1,9 @@
 import unittest
 from romanz import romanz
 
-_TEST_GALCAT_ = "romanz/data/Akari_Hosts_subset_SNR_v7.HOSTLIB"
+_TEST_HOSTLIB_ = "romanz/data/Akari_Hosts_subset_SNR_v7.HOSTLIB"
+_TEST_GALCAT_ = "romanz/data/Akari_input_catalog_20210415.fits"
+_TEST_SPECZCOMPLETENESSMAP_ = "romanz/data/specz_completeness_map_preromandata_cosmos.ecsv"
 
 class TestCatalogBasedRedshiftSim(unittest.TestCase):
     """Test class for projecting redshift completeness from an input
@@ -44,7 +46,14 @@ class TestCatalogBasedRedshiftSim(unittest.TestCase):
         of SN host galaxy properties (already read in) to define exactly which
         of those host galaxies gets a redshift.
         """
-        self.assertEqual(True, False)
+        interpolatordict = self.romanz_sim.apply_specz_completeness_map(
+            _TEST_SPECZCOMPLETENESSMAP_,
+            defining_columns_galcat=['g_LSST', 'r_LSST', 'i_LSST', 'z_LSST'],
+            defining_columns_speczmap=['mag', 'mag', 'mag', 'mag'],
+            efficiency_columns_speczmap=['efficiency_g', 'efficiency_r',
+                                        'efficiency_i', 'efficiency_z'],
+        )
+
 
     def test_make_photoz_accuracy_map(self):
         """For every galaxy in the catalog of galaxy properties, apply a

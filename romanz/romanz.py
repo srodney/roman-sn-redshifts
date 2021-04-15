@@ -72,15 +72,17 @@ class CatalogBasedRedshiftSim():
           magnitudes, etc.).  May be a SNANA HOSTLIB file, or any formtat that
           can be auto-parsed by astropy.table.Table.read()
         """
-        # First check if it is a hostlib file
+        # TODO: check if it is a hostlib without try/except
         try :
-            hostlib = SNANAHostLib(filename)
-            self.galaxies = hostlib.galdatatable
-        except RuntimeError:
-            pass
-        # if its not a hostlib file, use astropy Table.read()
-        if self.galaxies is None:
             self.galaxies = table.Table.read(filename)
+        except:
+            try:
+                hostlib = SNANAHostLib(filename)
+                self.galaxies = hostlib.galdatatable
+            except:
+                raise RuntimeError(
+                    f"Can't read in {filename}. "
+                    "It may not be a valid hostlib or astropy-readable table.")
         return
 
 
@@ -206,7 +208,7 @@ class CatalogBasedRedshiftSim():
     def apply_specz_completeness_map(self, filename,
                                      defining_columns_galcat,
                                      defining_columns_speczmap,
-                                     efficiency_column_speczmap,
+                                     efficiency_columns_speczmap,
                                      fill_value = np.nan
                                      ):
         """Read in a 'map' for spectroscopic redshift completeness, which
@@ -235,38 +237,41 @@ class CatalogBasedRedshiftSim():
            efficiency (e.g. if this is a SFR-based specz map then this may
            be ['logSFR'])
 
-        defining_columns_speczmap : listlike
+        defining_columns_speczmap : listlike, same length as above
            list of strings specifying the corresponding column names in the
            specz map file (given by 'filename').  Must be the same length as
            defining_columns_galcat, giving corresponding column names in the
            same order.
 
-        efficiency_column_speczmap : str
-           Name of the column that contains the specz efficiency (or
-           completeness fraction) for each row in the specz map file.
+        efficiency_columns_speczmap : listlike, same length as above
+           list of column names giving the specz
+           efficiency (or completeness fraction) for each row in the specz
+           map file.
         """
-        if len(defining_columns_galcat)!=len(defining_columns_speczmap):
+        if (len(defining_columns_galcat)!=len(defining_columns_speczmap) or
+            len(defining_columns_galcat)!=len(efficiency_columns_speczmap)):
             raise RuntimeError(
                 'You must specify the same number of columns from the '
-                'galaxy catalog and the specz efficiency catalog.'
-            )
+                'galaxy catalog and the specz efficiency catalog.')
 
-        speczmap = Table.read(filename)
+        # TODO : make a masked array to remove NaNs ? ?
+        speczmap = table.Table.read(filename)
 
-        # build an interpolating function from the specz efficiency map
-        points = np.array(
-            [speczmap[colname] for colname in defining_columns_speczmap])
-        points = points.reshape(
-            (len(defining_columns_speczmap), len(speczmap)))
+        # TODO : build a separate interpolating function for each of
+        #  the possible input parameters ?
+        interpolatordict = {}
+        for i in range(len(defining_columns_galcat)):
+            colname_galcat = defining_columns_galcat[i]
+            xobs = self.galaxies[colname_galcat]
+            colname_param = defining_columns_speczmap[i]
+            x = speczmap[colname_param]
+            colname_efficiency = efficiency_columns_speczmap[i]
+            y = speczmap[colname_efficiency]
+            interpolator = scinterp.interp1d(
+                x, y, bounds_error=False, fill_value=fill_value)
+            interpolatordict[colname_galcat] = interpolator
 
-        # TODO: reduce dimensionality of indata when possible
-        values = speczmap[efficiency_column_speczmap]
-
-        # TODO? : choose interpolation function based on dimensionality?
-        interpolator = scinterp.LinearNDInterpolator(
-            points, values, fill_value=fill_value)
-
-        return(interpolator)
+        return(interpolatordict)
 
     def make_photoz_accuracy_map(self):
         """For every galaxy in the catalog of galaxy properties, apply a
