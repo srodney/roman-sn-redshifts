@@ -12,8 +12,9 @@ class SNANAHostLib():
         """Read in a SNANA HOSTLIB file"""
         # find the 'VARNAMES' line, use it to define the start of the hostlib
         # section (as opposed to the wgtmap section)
-        ngaldatastart = -1
         nwgtmapstart = -1
+        ngaldataheader = -1
+        ngaldatastart = -1
         iline = 0
         with open(filename, 'r') as read_obj:
             for line in read_obj:
@@ -29,6 +30,9 @@ class SNANAHostLib():
                 if line.strip().startswith('VARNAMES:'):
                     ngaldataheader = iline
                 iline += 1
+        if ngaldataheader < 0:
+            raise RuntimeError(r"{filename} is not an SNANA HOSTLIB file")
+
         if nwgtmapstart >= 0:
             self.wgtmaptable = Table.read(
                 filename, format='ascii.basic',
@@ -68,11 +72,17 @@ class CatalogBasedRedshiftSim():
           magnitudes, etc.).  May be a SNANA HOSTLIB file, or any formtat that
           can be auto-parsed by astropy.table.Table.read()
         """
-        # check if it is a hostlib file
-
-
-        self.galaxies = Table.read(filename)
+        # First check if it is a hostlib file
+        try :
+            hostlib = SNANAHostLib(filename)
+            self.galaxies = hostlib.galdatatable
+        except RuntimeError:
+            pass
+        # if its not a hostlib file, use astropy Table.read()
+        if self.galaxies is None:
+            self.galaxies = Table.read(filename)
         return
+
 
     def pick_host_galaxies(self):
         """Use a SN rate function to define a random

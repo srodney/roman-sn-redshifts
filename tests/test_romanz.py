@@ -1,7 +1,7 @@
 import unittest
-from . import romanz
+from romanz import romanz
 
-_TEST_GALCAT_ = "data/Akari_Hosts_subset_SNR_v7.HOSTLIB"
+_TEST_GALCAT_ = "romanz/data/Akari_Hosts_subset_SNR_v7.HOSTLIB"
 
 class TestCatalogBasedRedshiftSim(unittest.TestCase):
     """Test class for projecting redshift completeness from an input
@@ -20,7 +20,7 @@ class TestCatalogBasedRedshiftSim(unittest.TestCase):
     def test_read_catalog(self):
         """Read in a catalog of galaxy properties"""
         # TODO : convert to a unittest setup step?
-        self.assertEqual(True, False)
+        self.assertTrue(self.romanz_sim.galaxies is not None)
 
     def test_pick_host_galaxies(self):
         """Use a SN rate function to define a random
